@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:untitled/features/dock/widgets/dock.dart';
+import 'package:untitled/features/dock/widgets/reorderable_item.dart';
 import 'application/dock_controller.dart';
-
 
 class DockPage extends StatelessWidget {
   DockPage({super.key});
@@ -20,15 +20,10 @@ class DockPage extends StatelessWidget {
 
           return Dock<IconData>(
             items: icons,
-            builder: (e) => Container(
-              constraints: const BoxConstraints(minWidth: 48),
-              height: 48,
-              margin: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.primaries[e.hashCode % Colors.primaries.length],
-              ),
-              child: Center(child: Icon(e, color: Colors.white)),
+            builder: (e) => ReorderableItem(
+              color: Colors.primaries[e.hashCode % Colors.primaries.length],
+              icon: e,
+              popoverText: 'Icon ${e.codePoint}',
             ),
             onReorder: (newIcons) {
               final newIndices = newIcons

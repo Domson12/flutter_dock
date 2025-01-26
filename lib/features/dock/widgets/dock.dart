@@ -1,7 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:reorderables/reorderables.dart';
+import 'package:untitled/features/dock/widgets/reorderable_wrap.dart';
 
-class Dock<T> extends StatefulWidget {
+class Dock<T extends Object> extends StatefulWidget {
   const Dock({
     super.key,
     this.items = const [],
@@ -22,63 +23,91 @@ class Dock<T> extends StatefulWidget {
   State<Dock<T>> createState() => _DockState<T>();
 }
 
-class _DockState<T> extends State<Dock<T>> {
+class _DockState<T extends Object> extends State<Dock<T>> with SingleTickerProviderStateMixin {
   /// [T] items being manipulated.
   late final List<T> _items = widget.items.toList();
 
+
+  double? _mouseXPosition;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  double _calculateTargetScale(int index, BuildContext context) {
+    if (_mouseXPosition == null) {
+      return 1.0;
+    }
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return 1.0;
+
+    final itemWidth = box.size.width / _items.length;
+    final iconCenter = (index + 0.5) * itemWidth;
+    final distance = (_mouseXPosition! - iconCenter).abs();
+
+    const double maxDistance = 80.0;
+    const double maxScale = 1.5;
+
+    if (distance > maxDistance) return 1.0;
+
+    final scale = maxScale - (distance / maxDistance) * (maxScale - 1.0);
+    return max(1.0, scale);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.black12,
-      ),
-      padding: const EdgeInsets.all(4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ReorderableWrap(
-          spacing: 8.0,
-          runSpacing: 0.0,
-          direction: Axis.horizontal,
+    return MouseRegion(
+      onHover: (event) {
+        setState(() {
+          _mouseXPosition = event.localPosition.dx;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _mouseXPosition = null;
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.black12,
+        ),
+        padding: const EdgeInsets.all(4),
+        child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          alignment: WrapAlignment.start,
-          buildDraggableFeedback: (context, constraints, child) {
-            return Material(
-              color: Colors.transparent,
-              child: Container(
-                constraints: constraints,
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurStyle: BlurStyle.inner,
-                      blurRadius: 4,
-                      spreadRadius: 2,
-                      offset: const Offset(0.5, 0.5),
-                    ),
-                  ],
-                  borderRadius: BorderRadius.circular(8),
+          child: ReorderableWrap<T>(
+            items: _items,
+            builder: (item) {
+              final index = _items.indexOf(item);
+              return TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+                tween: Tween<double>(
+                  begin: 1.0,
+                  end: _calculateTargetScale(index, context),
                 ),
-                child: child,
-              ),
-            );
-          },
-          padding: const EdgeInsets.all(8),
-          onReorder: (oldIndex, newIndex) {
-            final item = _items.removeAt(oldIndex);
-            _items.insert(newIndex, item);
-            setState(() {});
-            if (widget.onReorder != null) {
-              widget.onReorder!(_items);
-            }
-          },
-          children: _items.map((e) {
-            return Container(
-              color: Colors.transparent,
-              key: ValueKey(e),
-              child: widget.builder(e),
-            );
-          }).toList(),
+                builder: (context, scale, child) {
+                  return Transform.scale(
+                    scale: scale,
+                    child: child,
+                  );
+                },
+                child: widget.builder(item),
+              );
+            },
+            onReorder: (updatedItems) {
+              setState(() {
+                _items
+                  ..clear()
+                  ..addAll(updatedItems);
+              });
+              widget.onReorder?.call(updatedItems);
+            },
+            spacing: 8.0,
+            runSpacing: 8.0,
+          ),
         ),
       ),
     );
