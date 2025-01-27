@@ -5,9 +5,7 @@ import 'features/dock/application/dock_controller.dart';
 import 'features/dock/dock_page.dart';
 
 void main() {
-  /// Put the controller here so it's available throughout the app.
   Get.put(DockController());
-
   runApp(const MyApp());
 }
 

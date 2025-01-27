@@ -15,7 +15,6 @@ class AnimatedDock extends StatefulWidget {
 class _AnimatedDockState extends State<AnimatedDock> {
   final DockController controller = Get.find<DockController>();
 
-  // Local list of DockItems, based on controller.dockItems and dockItemModels
   List<DockItem> items = [];
 
   int? hoveredIndex;
@@ -34,7 +33,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
   @override
   void initState() {
     super.initState();
-    // Rebuild local items whenever the controller changes:
     ever<List<int>>(controller.dockItems, (_) => _rebuildItems());
     _rebuildItems();
   }
@@ -123,10 +121,9 @@ class _AnimatedDockState extends State<AnimatedDock> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       curve: Curves.easeInOut,
-                      // SHIFT horizontally so the scale remains centered.
                       transform: Matrix4.identity()
                         ..translate(
-                          (baseItemHeight - scaledSize) / 2, // center horizontally
+                          (baseItemHeight - scaledSize) / 2,
                           _getTranslationY(index),
                         ),
                       height: baseItemHeight,
@@ -138,7 +135,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
                         scale: scale,
                         child: AspectRatio(
                           aspectRatio: 1,
-                          // Here's our custom item widget:
                           child: ReorderableItem(
                             icon: items[index].iconData,
                             color: Colors.primaries[
@@ -155,7 +151,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
                 ),
               );
             })
-            // Ensure the dragged item is on top visually
               ..sort((a, b) {
                 final aIndex = items.indexWhere((item) => item.key == a.key);
                 final bIndex = items.indexWhere((item) => item.key == b.key);
@@ -174,8 +169,8 @@ class _AnimatedDockState extends State<AnimatedDock> {
     return _getPropertyValue(
       index: index,
       baseValue: baseItemHeight,
-      maxValue: 70, // hovered size
-      nonHoveredMaximumValue: 60, // near-hover size
+      maxValue: 70,
+      nonHoveredMaximumValue: 60,
     );
   }
 
@@ -199,10 +194,8 @@ class _AnimatedDockState extends State<AnimatedDock> {
     final itemsAffected = items.length;
 
     if (diff == 0) {
-      // hovered item
       return maxValue;
     } else if (diff <= itemsAffected) {
-      // near-hover items
       final ratio = (itemsAffected - diff) / itemsAffected;
       return lerpDouble(baseValue, nonHoveredMaximumValue, ratio)!;
     } else {
@@ -214,7 +207,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     return items.fold(0.0, (total, item) {
       final i = items.indexOf(item);
       final scaled = _getScaledSize(i);
-      return total + scaled + 10; // plus spacing
+      return total + scaled + 10;
     });
   }
 
@@ -243,7 +236,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
 
       items[index].position = newPosition;
 
-      // Reorder items visually if inside the dock:
       if (_isInsideDock(details.globalPosition)) {
         final relativeX = newPosition.dx - dockPosition.dx;
         int targetIndex = (relativeX / itemWidth).round();
@@ -276,7 +268,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
           }
         }
       } else {
-        // Snap other items back if we leave the dock
         for (int i = 0; i < items.length; i++) {
           if (i != index) {
             items[i].position = items[i].originalPosition;
@@ -289,17 +280,15 @@ class _AnimatedDockState extends State<AnimatedDock> {
   void _handlePanEnd(int index, DragEndDetails details) {
     setState(() {
       if (!_isInsideDock(details.globalPosition)) {
-        // Snap back if dropped outside
+
         items[index].position = items[index].originalPosition;
       } else {
-        // Officially reorder the list
         final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
         if (dockBox != null) {
           final dockStartX = dockBox.localToGlobal(Offset.zero).dx + 26;
 
           final draggedItem = items.removeAt(index);
 
-          // Figure out correct new index
           int newIndex = items.length;
           for (int i = 0; i < items.length; i++) {
             if (items[i].position.dx > draggedItem.position.dx) {
@@ -309,7 +298,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
           }
           items.insert(newIndex, draggedItem);
 
-          // Reassign positions as final
+
           const itemSpacing = 60;
           for (int i = 0; i < items.length; i++) {
             final newPos = Offset(
@@ -320,7 +309,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
             items[i].originalPosition = newPos;
           }
 
-          // Update the DockController
           final newOrder = items.map((e) => e.indexInController).toList();
           controller.updateDockItems(newOrder);
         }

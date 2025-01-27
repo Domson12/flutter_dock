@@ -24,10 +24,9 @@ class ReorderableItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
-      clipBehavior: Clip.none, // so the popover can extend outside
+      clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        // The main item (48px box with margin, color, icon, etc.)
         Container(
           constraints: const BoxConstraints(minWidth: 48),
           height: 48,
@@ -41,10 +40,9 @@ class ReorderableItem extends StatelessWidget {
           ),
         ),
 
-        // The teardrop popover, only show if hovered & not dragging
         if (isHovering && !isDragging)
           Positioned(
-            top: -60, // place it above the item
+            top: -60,
             child: TeardropPopover(
               color: Colors.white,
               borderColor: Colors.grey,
