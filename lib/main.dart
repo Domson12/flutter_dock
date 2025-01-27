@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:get/get_navigation/src/root/get_material_app.dart';
-import 'package:untitled/features/dock/dock_page.dart';
+import 'package:get/get.dart';
 
-/// Entrypoint of the application.
+import 'features/dock/application/dock_controller.dart';
+import 'features/dock/dock_page.dart';
+
 void main() {
+  /// Put the controller here so it's available throughout the app.
+  Get.put(DockController());
+
   runApp(const MyApp());
 }
 
-/// [Widget] building the [MaterialApp].
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    return const GetMaterialApp(
+      title: 'Dock Demo',
+      debugShowCheckedModeBanner: false,
       home: DockPage(),
     );
   }

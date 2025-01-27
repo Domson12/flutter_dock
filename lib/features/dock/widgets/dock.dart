@@ -1,115 +1,341 @@
-import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:untitled/features/dock/widgets/reorderable_wrap.dart';
+import 'package:get/get.dart';
+import 'package:untitled/features/dock/widgets/reorderable_item.dart';
+import '../application/dock_controller.dart';
+import '../application/models/dock_item.dart';
 
-class Dock<T extends Object> extends StatefulWidget {
-  const Dock({
-    super.key,
-    this.items = const [],
-    required this.builder,
-    this.onReorder,
-  });
-
-  /// Initial [T] items to put in this [Dock].
-  final List<T> items;
-
-  /// Builder building the provided [T] item.
-  final Widget Function(T) builder;
-
-  /// Callback to notify when items are reordered.
-  final void Function(List<T>)? onReorder;
+class AnimatedDock extends StatefulWidget {
+  const AnimatedDock({super.key});
 
   @override
-  State<Dock<T>> createState() => _DockState<T>();
+  State<AnimatedDock> createState() => _AnimatedDockState();
 }
 
-class _DockState<T extends Object> extends State<Dock<T>> with SingleTickerProviderStateMixin {
-  /// [T] items being manipulated.
-  late final List<T> _items = widget.items.toList();
+class _AnimatedDockState extends State<AnimatedDock> {
+  final DockController controller = Get.find<DockController>();
 
+  // Local list of DockItems, based on controller.dockItems and dockItemModels
+  List<DockItem> items = [];
 
-  double? _mouseXPosition;
+  int? hoveredIndex;
+  double baseItemHeight = 50;
+  double baseTranslationYaxis = 0;
+  double verticalPadding = 10;
+
+  final GlobalKey _dockKey = GlobalKey();
+
+  bool isDragging = false;
+  Offset dragOffset = Offset.zero;
+  bool goBackToOriginalPosition = true;
+  int? draggingIndex;
+  double dockWidth = 0.0;
 
   @override
   void initState() {
     super.initState();
+    // Rebuild local items whenever the controller changes:
+    ever<List<int>>(controller.dockItems, (_) => _rebuildItems());
+    _rebuildItems();
   }
 
-  double _calculateTargetScale(int index, BuildContext context) {
-    if (_mouseXPosition == null) {
-      return 1.0;
+  void _rebuildItems() {
+    final iconIndices = controller.dockItems;
+    final newItems = <DockItem>[];
+    for (int i = 0; i < iconIndices.length; i++) {
+      final model = controller.dockItemModels[iconIndices[i]];
+      newItems.add(
+        DockItem(
+          iconData: model.iconData,
+          label: model.label,
+          indexInController: model.indexInController,
+        ),
+      );
     }
 
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return 1.0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final screenWidth = MediaQuery.of(context).size.width;
+      final screenHeight = MediaQuery.of(context).size.height;
+      const itemSpacing = 10;
 
-    final itemWidth = box.size.width / _items.length;
-    final iconCenter = (index + 0.5) * itemWidth;
-    final distance = (_mouseXPosition! - iconCenter).abs();
+      final totalWidth = newItems.length * (baseItemHeight + itemSpacing);
+      final startX = ((screenWidth - totalWidth) / 2) + 4;
+      final centerY = (screenHeight / 2) - 42;
 
-    const double maxDistance = 80.0;
-    const double maxScale = 1.5;
+      for (int i = 0; i < newItems.length; i++) {
+        newItems[i].position =
+            Offset(startX + (i * (baseItemHeight + itemSpacing)), centerY);
+        newItems[i].originalPosition = newItems[i].position;
+      }
 
-    if (distance > maxDistance) return 1.0;
-
-    final scale = maxScale - (distance / maxDistance) * (maxScale - 1.0);
-    return max(1.0, scale);
+      setState(() {
+        items = newItems;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onHover: (event) {
-        setState(() {
-          _mouseXPosition = event.localPosition.dx;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _mouseXPosition = null;
-        });
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: Colors.black12,
+    dockWidth = _calculateDockWidth();
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedContainer(
+          key: _dockKey,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+          height: baseItemHeight + 16,
+          width: dockWidth,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.black12,
+          ),
+          padding: const EdgeInsets.all(4),
         ),
-        padding: const EdgeInsets.all(4),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ReorderableWrap<T>(
-            items: _items,
-            builder: (item) {
-              final index = _items.indexOf(item);
-              return TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-                tween: Tween<double>(
-                  begin: 1.0,
-                  end: _calculateTargetScale(index, context),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: List.generate(items.length, (index) {
+              final scaledSize = _getScaledSize(index);
+              final scale = scaledSize / baseItemHeight;
+              final itemPosition = items[index].position;
+
+              return AnimatedPositioned(
+                key: items[index].key,
+                duration: Duration(
+                  milliseconds: goBackToOriginalPosition && draggingIndex != index
+                      ? 400
+                      : 0,
                 ),
-                builder: (context, scale, child) {
-                  return Transform.scale(
-                    scale: scale,
-                    child: child,
-                  );
-                },
-                child: widget.builder(item),
+                curve: Curves.easeInOut,
+                left: itemPosition.dx,
+                top: itemPosition.dy,
+                child: MouseRegion(
+                  onEnter: (_) => setState(() => hoveredIndex = index),
+                  onExit: (_) => setState(() => hoveredIndex = null),
+                  child: GestureDetector(
+                    onPanStart: (details) => _handlePanStart(index, details),
+                    onPanUpdate: (details) => _handlePanUpdate(index, details),
+                    onPanEnd: (details) => _handlePanEnd(index, details),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                      // SHIFT horizontally so the scale remains centered.
+                      transform: Matrix4.identity()
+                        ..translate(
+                          (baseItemHeight - scaledSize) / 2, // center horizontally
+                          _getTranslationY(index),
+                        ),
+                      height: baseItemHeight,
+                      width: scaledSize,
+                      alignment: Alignment.bottomCenter,
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                        scale: scale,
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          // Here's our custom item widget:
+                          child: ReorderableItem(
+                            icon: items[index].iconData,
+                            color: Colors.primaries[
+                            items[index].iconData.hashCode %
+                                Colors.primaries.length],
+                            label: items[index].label,
+                            isHovering: (hoveredIndex == index),
+                            isDragging: (draggingIndex == index),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               );
-            },
-            onReorder: (updatedItems) {
-              setState(() {
-                _items
-                  ..clear()
-                  ..addAll(updatedItems);
-              });
-              widget.onReorder?.call(updatedItems);
-            },
-            spacing: 8.0,
-            runSpacing: 8.0,
+            })
+            // Ensure the dragged item is on top visually
+              ..sort((a, b) {
+                final aIndex = items.indexWhere((item) => item.key == a.key);
+                final bIndex = items.indexWhere((item) => item.key == b.key);
+                if (draggingIndex == aIndex) return 1;
+                if (draggingIndex == bIndex) return -1;
+                return 0;
+              }),
           ),
         ),
-      ),
+      ],
     );
+  }
+
+  /// Scaling and translation logic:
+  double _getScaledSize(int index) {
+    return _getPropertyValue(
+      index: index,
+      baseValue: baseItemHeight,
+      maxValue: 70, // hovered size
+      nonHoveredMaximumValue: 60, // near-hover size
+    );
+  }
+
+  double _getTranslationY(int index) {
+    return _getPropertyValue(
+      index: index,
+      baseValue: baseTranslationYaxis,
+      maxValue: -10,
+      nonHoveredMaximumValue: -5,
+    );
+  }
+
+  double _getPropertyValue({
+    required int index,
+    required double baseValue,
+    required double maxValue,
+    required double nonHoveredMaximumValue,
+  }) {
+    if (hoveredIndex == null) return baseValue;
+    final diff = (hoveredIndex! - index).abs();
+    final itemsAffected = items.length;
+
+    if (diff == 0) {
+      // hovered item
+      return maxValue;
+    } else if (diff <= itemsAffected) {
+      // near-hover items
+      final ratio = (itemsAffected - diff) / itemsAffected;
+      return lerpDouble(baseValue, nonHoveredMaximumValue, ratio)!;
+    } else {
+      return baseValue;
+    }
+  }
+
+  double _calculateDockWidth() {
+    return items.fold(0.0, (total, item) {
+      final i = items.indexOf(item);
+      final scaled = _getScaledSize(i);
+      return total + scaled + 10; // plus spacing
+    });
+  }
+
+  /// Drag logic:
+
+  void _handlePanStart(int index, DragStartDetails details) {
+    setState(() {
+      draggingIndex = index;
+      final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
+      if (dockBox != null) {
+        dragOffset = items[index].position - dockBox.globalToLocal(details.globalPosition);
+      }
+      isDragging = true;
+    });
+  }
+
+  void _handlePanUpdate(int index, DragUpdateDetails details) {
+    final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
+    if (dockBox == null) return;
+
+    setState(() {
+      final dockPosition = dockBox.localToGlobal(Offset.zero);
+      final itemWidth = baseItemHeight + 10;
+      final newPosition =
+          dockBox.globalToLocal(details.globalPosition) + dragOffset;
+
+      items[index].position = newPosition;
+
+      // Reorder items visually if inside the dock:
+      if (_isInsideDock(details.globalPosition)) {
+        final relativeX = newPosition.dx - dockPosition.dx;
+        int targetIndex = (relativeX / itemWidth).round();
+        targetIndex = targetIndex.clamp(0, items.length - 1);
+
+        final baseX = items[0].originalPosition.dx;
+        final baseY = items[0].originalPosition.dy;
+
+        if (targetIndex > index) {
+          for (int i = 0; i < items.length; i++) {
+            if (i == index) continue;
+            if (i < index) {
+              items[i].position = Offset(baseX + (i * itemWidth), baseY);
+            } else if (i <= targetIndex) {
+              items[i].position = Offset(baseX + ((i - 1) * itemWidth), baseY);
+            } else {
+              items[i].position = Offset(baseX + (i * itemWidth), baseY);
+            }
+          }
+        } else {
+          for (int i = 0; i < items.length; i++) {
+            if (i == index) continue;
+            if (i < targetIndex) {
+              items[i].position = Offset(baseX + (i * itemWidth), baseY);
+            } else if (i < index) {
+              items[i].position = Offset(baseX + ((i + 1) * itemWidth), baseY);
+            } else {
+              items[i].position = Offset(baseX + (i * itemWidth), baseY);
+            }
+          }
+        }
+      } else {
+        // Snap other items back if we leave the dock
+        for (int i = 0; i < items.length; i++) {
+          if (i != index) {
+            items[i].position = items[i].originalPosition;
+          }
+        }
+      }
+    });
+  }
+
+  void _handlePanEnd(int index, DragEndDetails details) {
+    setState(() {
+      if (!_isInsideDock(details.globalPosition)) {
+        // Snap back if dropped outside
+        items[index].position = items[index].originalPosition;
+      } else {
+        // Officially reorder the list
+        final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
+        if (dockBox != null) {
+          final dockStartX = dockBox.localToGlobal(Offset.zero).dx + 26;
+
+          final draggedItem = items.removeAt(index);
+
+          // Figure out correct new index
+          int newIndex = items.length;
+          for (int i = 0; i < items.length; i++) {
+            if (items[i].position.dx > draggedItem.position.dx) {
+              newIndex = i;
+              break;
+            }
+          }
+          items.insert(newIndex, draggedItem);
+
+          // Reassign positions as final
+          const itemSpacing = 60;
+          for (int i = 0; i < items.length; i++) {
+            final newPos = Offset(
+              dockStartX + i * itemSpacing,
+              items[0].originalPosition.dy,
+            );
+            items[i].position = newPos;
+            items[i].originalPosition = newPos;
+          }
+
+          // Update the DockController
+          final newOrder = items.map((e) => e.indexInController).toList();
+          controller.updateDockItems(newOrder);
+        }
+      }
+
+      draggingIndex = null;
+      isDragging = false;
+      goBackToOriginalPosition = true;
+    });
+  }
+
+  bool _isInsideDock(Offset globalPos) {
+    final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
+    if (dockBox == null) return false;
+    final dockBounds = dockBox.localToGlobal(Offset.zero) & dockBox.size;
+    return dockBounds.contains(globalPos);
   }
 }
