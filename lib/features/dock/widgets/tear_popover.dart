@@ -1,13 +1,26 @@
 import 'package:flutter/material.dart';
 
+/// A custom painter that draws a teardrop-shaped background with optional borders
 class TeardropPopover extends StatelessWidget {
+  /// content inside the popover
   final Widget child;
+
+  /// fill color of the popover
   final Color color;
+
+  /// border color of the popover
   final Color borderColor;
+
+  /// width of the border around the popover
   final double borderWidth;
+
+  /// padding around the content inside the popover
   final EdgeInsets padding;
+
+  /// corner radius for the rounded edges of the popover
   final double cornerRadius;
 
+  /// Creates a [TeardropPopover] with customizable fill and border styles
   const TeardropPopover({
     super.key,
     required this.child,
@@ -41,12 +54,21 @@ class TeardropPopover extends StatelessWidget {
   }
 }
 
+/// A custom painter that draws a teardrop
 class TeardropPainter extends CustomPainter {
+  /// fill color for teardrop
   final Color color;
+
+  /// border color for teardrop
   final Color borderColor;
+
+  /// width of the border around the teardrop
   final double borderWidth;
+
+  /// The corner radius
   final double cornerRadius;
 
+  /// Creates a [TeardropPainter] with customizable fill and border styles
   TeardropPainter({
     required this.color,
     required this.borderColor,
@@ -70,12 +92,12 @@ class TeardropPainter extends CustomPainter {
     path.moveTo(cornerRadius, 0);
     path.lineTo(size.width - cornerRadius, 0);
     path.quadraticBezierTo(size.width, 0, size.width, cornerRadius);
+
     path.lineTo(size.width, size.height - 20 - cornerRadius);
     path.quadraticBezierTo(
         size.width, size.height - 20, size.width - cornerRadius, size.height - 20);
+
     path.lineTo(size.width / 2 + 10, size.height - 20);
-
-
     path.lineTo(size.width / 2, size.height);
     path.lineTo(size.width / 2 - 10, size.height - 20);
 

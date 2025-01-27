@@ -5,25 +5,32 @@ import 'package:untitled/features/dock/widgets/reorderable_item.dart';
 import '../application/dock_controller.dart';
 import '../application/models/dock_item.dart';
 
-class AnimatedDock extends StatefulWidget {
-  const AnimatedDock({super.key});
+class Dock extends StatefulWidget {
+  const Dock({super.key});
 
   @override
-  State<AnimatedDock> createState() => _AnimatedDockState();
+  State<Dock> createState() => _DockState();
 }
 
-class _AnimatedDockState extends State<AnimatedDock> {
+class _DockState extends State<Dock> {
+  /// The Dock controller instance
   final DockController controller = Get.find<DockController>();
 
+  /// List of Dock items
   List<DockItem> items = [];
 
+  /// The index of the currently hovered item
   int? hoveredIndex;
+
+  /// Dock item size
   double baseItemHeight = 50;
   double baseTranslationYaxis = 0;
   double verticalPadding = 10;
 
+  /// Key for the Dock container
   final GlobalKey _dockKey = GlobalKey();
 
+  /// Tracks the drag state
   bool isDragging = false;
   Offset dragOffset = Offset.zero;
   bool goBackToOriginalPosition = true;
@@ -37,9 +44,11 @@ class _AnimatedDockState extends State<AnimatedDock> {
     _rebuildItems();
   }
 
+  /// Builds the list of Dock items
   void _rebuildItems() {
     final iconIndices = controller.dockItems;
     final newItems = <DockItem>[];
+
     for (int i = 0; i < iconIndices.length; i++) {
       final model = controller.dockItemModels[iconIndices[i]];
       newItems.add(
@@ -53,13 +62,14 @@ class _AnimatedDockState extends State<AnimatedDock> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+
+      /// Calculate positions for each item
       final screenWidth = MediaQuery.of(context).size.width;
-      final screenHeight = MediaQuery.of(context).size.height;
       const itemSpacing = 10;
 
       final totalWidth = newItems.length * (baseItemHeight + itemSpacing);
       final startX = ((screenWidth - totalWidth) / 2) + 4;
-      final centerY = (screenHeight / 2) - 42;
+      final centerY = MediaQuery.of(context).size.height / 2 - 42;
 
       for (int i = 0; i < newItems.length; i++) {
         newItems[i].position =
@@ -104,9 +114,10 @@ class _AnimatedDockState extends State<AnimatedDock> {
               return AnimatedPositioned(
                 key: items[index].key,
                 duration: Duration(
-                  milliseconds: goBackToOriginalPosition && draggingIndex != index
-                      ? 400
-                      : 0,
+                  milliseconds:
+                      goBackToOriginalPosition && draggingIndex != index
+                          ? 400
+                          : 0,
                 ),
                 curve: Curves.easeInOut,
                 left: itemPosition.dx,
@@ -138,8 +149,8 @@ class _AnimatedDockState extends State<AnimatedDock> {
                           child: ReorderableItem(
                             icon: items[index].iconData,
                             color: Colors.primaries[
-                            items[index].iconData.hashCode %
-                                Colors.primaries.length],
+                                items[index].iconData.hashCode %
+                                    Colors.primaries.length],
                             label: items[index].label,
                             isHovering: (hoveredIndex == index),
                             isDragging: (draggingIndex == index),
@@ -164,7 +175,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     );
   }
 
-  /// Scaling and translation logic:
+  /// Determines the scaled size for an item
   double _getScaledSize(int index) {
     return _getPropertyValue(
       index: index,
@@ -174,6 +185,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     );
   }
 
+  /// Calculates the vertical translation
   double _getTranslationY(int index) {
     return _getPropertyValue(
       index: index,
@@ -183,6 +195,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     );
   }
 
+  /// Calculates the property value based on the hovered index
   double _getPropertyValue({
     required int index,
     required double baseValue,
@@ -190,6 +203,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     required double nonHoveredMaximumValue,
   }) {
     if (hoveredIndex == null) return baseValue;
+
     final diff = (hoveredIndex! - index).abs();
     final itemsAffected = items.length;
 
@@ -203,6 +217,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     }
   }
 
+  /// Calculates the total width of the Dock
   double _calculateDockWidth() {
     return items.fold(0.0, (total, item) {
       final i = items.indexOf(item);
@@ -211,19 +226,22 @@ class _AnimatedDockState extends State<AnimatedDock> {
     });
   }
 
-  /// Drag logic:
-
+  /// Handles the start of a drag
   void _handlePanStart(int index, DragStartDetails details) {
     setState(() {
       draggingIndex = index;
+
       final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
       if (dockBox != null) {
-        dragOffset = items[index].position - dockBox.globalToLocal(details.globalPosition);
+        dragOffset = items[index].position -
+            dockBox.globalToLocal(details.globalPosition);
       }
+
       isDragging = true;
     });
   }
 
+  /// Handles updates during a drag gesture
   void _handlePanUpdate(int index, DragUpdateDetails details) {
     final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
     if (dockBox == null) return;
@@ -277,13 +295,14 @@ class _AnimatedDockState extends State<AnimatedDock> {
     });
   }
 
+  /// Handles the end of a drag gesture
   void _handlePanEnd(int index, DragEndDetails details) {
     setState(() {
       if (!_isInsideDock(details.globalPosition)) {
-
         items[index].position = items[index].originalPosition;
       } else {
-        final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
+        final dockBox =
+            _dockKey.currentContext?.findRenderObject() as RenderBox?;
         if (dockBox != null) {
           final dockStartX = dockBox.localToGlobal(Offset.zero).dx + 26;
 
@@ -297,7 +316,6 @@ class _AnimatedDockState extends State<AnimatedDock> {
             }
           }
           items.insert(newIndex, draggedItem);
-
 
           const itemSpacing = 60;
           for (int i = 0; i < items.length; i++) {
@@ -320,6 +338,7 @@ class _AnimatedDockState extends State<AnimatedDock> {
     });
   }
 
+  /// Determines if a point is inside the Dock container
   bool _isInsideDock(Offset globalPos) {
     final dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox?;
     if (dockBox == null) return false;

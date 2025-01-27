@@ -14,7 +14,7 @@ class DockPage extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: Padding(
               padding: EdgeInsets.only(bottom: 16.0),
-              child: AnimatedDock(),
+              child: Dock(),
             ),
           ),
         ],

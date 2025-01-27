@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:untitled/features/dock/widgets/tear_popover.dart';
 
+/// Creates a [ReorderableItem] widget
+///
+/// - [icon] is the icon displayed in the Dock
+/// - [color] is the background color of the item
+/// - [label] is the text shown in the popover when the item is hovered
+/// - [isHovering] determines whether the item is currently hovered
+/// - [isDragging] determines whether the item is currently being dragged
 class ReorderableItem extends StatelessWidget {
   const ReorderableItem({
     super.key,
@@ -11,14 +18,19 @@ class ReorderableItem extends StatelessWidget {
     required this.isDragging,
   });
 
+  ///icon displayed in the Dock
   final IconData icon;
+
+  /// background color of the item
   final Color color;
+
+  /// text shown in the popover when the item is hovered
   final String label;
 
-  /// Tells us if this item is hovered in the Dock (used for showing popover).
+  /// Whether this item is currently hovered
   final bool isHovering;
 
-  /// Tells us if this item is currently being dragged.
+  /// Whether this item is currently being dragged
   final bool isDragging;
 
   @override
@@ -36,10 +48,14 @@ class ReorderableItem extends StatelessWidget {
             color: color,
           ),
           child: Center(
-            child: Icon(icon, color: Colors.white),
+            child: Icon(
+              icon,
+              color: Colors.white,
+            ),
           ),
         ),
 
+        /// Displays a popover above the itemm
         if (isHovering && !isDragging)
           Positioned(
             top: -60,
@@ -50,7 +66,10 @@ class ReorderableItem extends StatelessWidget {
               cornerRadius: 8.0,
               child: Text(
                 label,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
             ),
           ),
